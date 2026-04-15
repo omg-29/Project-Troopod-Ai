@@ -27,6 +27,11 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# Initialize a global semaphore to limit concurrent CRO generations.
+# This is critical for free-tier servers with limited RAM (512MB)
+# to prevent multiple Playwright/Chromium instances from crashing the server.
+generation_semaphore = asyncio.Semaphore(1)
+
 app = FastAPI(
     title="Troopod API",
     description="AI-powered Conversion Rate Optimization engine",
@@ -76,26 +81,26 @@ async def _run_pipeline(
     Step 4a: Prompt Enhancement
     Step 4b: Code Modification
     """
+    async with generation_semaphore:
+        # --- Step 1: Text Requirement Processing ---
+        yield _sse_event(StatusEvent(
+            stage="extraction",
+            message="Extracting requirements from your text input...",
+            progress=5,
+        ))
 
-    # --- Step 1: Text Requirement Processing ---
-    yield _sse_event(StatusEvent(
-        stage="extraction",
-        message="Extracting requirements from your text input...",
-        progress=5,
-    ))
+        try:
+            text_requirements = await process_text(text_input)
+        except Exception as exc:
+            logger.error("Step 1 failed: %s", exc)
+            yield _sse_error("extraction", f"Text processing failed: {exc}")
+            return
 
-    try:
-        text_requirements = await process_text(text_input)
-    except Exception as exc:
-        logger.error("Step 1 failed: %s", exc)
-        yield _sse_error("extraction", f"Text processing failed: {exc}")
-        return
-
-    yield _sse_event(StatusEvent(
-        stage="extraction",
-        message=f"Extracted {len(text_requirements.exact_keywords)} keywords successfully.",
-        progress=15,
-    ))
+        yield _sse_event(StatusEvent(
+            stage="extraction",
+            message=f"Extracted {len(text_requirements.exact_keywords)} keywords successfully.",
+            progress=15,
+        ))
 
     # --- Step 2: Image Creative Processing ---
     yield _sse_event(StatusEvent(

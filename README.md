@@ -107,10 +107,13 @@ The frontend runs at `http://localhost:5173` and proxies API requests to `http:/
 ## Technical Highlights
 
 - **Content Optimization:** Raw web pages are sent through a character-limiter that strips non-visual `data-*` attributes, base64 blobs, analytics scripts, and comments. This reduces token payloads by ~80%, eliminating generation timeouts and drastically saving costs.
+- **Lean Scraping (Free Tier Optimization):** To ensure stability on constrained environments (like Render Free Tier), the scraper employs tactical resource interception to block heavy, non-essential assets (Tracking scripts, Ads, Videos, and Fonts) *before* they consume RAM and CPU, while preserving critical visual elements.
 - **Smart Path Rewriting:** Transforms all relative URLs across CSS stylesheets and HTML into absolute paths, preventing `404 Not Found` errors when rendering the foreign webpage locally.
 - **Organic Code Modification Directive:** AI is strictly prompted to inject modifications that respect the legacy DOM structure, inheriting original global typography CSS rather than brute-forcing new designs.
 - **Surgical DOM Patching:** Instead of regenerating entire HTML documents (which hits token limits), Troopod uses a diff-based approach where Gemini returns structured JSON operations applied surgically via BeautifulSoup. This allows for processing pages up to 500K+ characters.
+- **Defensive Scraping Fallback:** If the full browser-based scraping engine fails or times out, the system automatically triggers a lightweight fallback using `HTTPX` and `lxml`. This "safety net" ensures the pipeline continues even if heavy browser rendering is impossible.
 - **Self-Healing Selector Retry:** If the AI produces invalid CSS selectors, the system automatically builds a "correction context" and triggers a fast retry, allowing the agent to self-heal and find the correct DOM elements.
+- **Concurrency Protection:** Implements an `asyncio.Semaphore` to limit resource-intensive CRO generations to one at a time. This prevents RAM exhaustion and OOM (Out of Memory) crashes on servers with limited resources.
 - **Windows asyncio Isolation:** Playwright is safely quarantined into a secondary background thread (`asyncio.to_thread`) bridging headless-browser compatibility with Uvicorn’s ProactorEventLoop on Windows.
 
 ---

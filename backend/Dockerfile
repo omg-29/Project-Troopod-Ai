@@ -14,9 +14,9 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# We don't need 'playwright install --with-deps' because the base image
-# already has everything. We just ensure the browsers are ready.
-RUN playwright install chromium
+# We ensure the browser and its system dependencies are fully ready.
+# PIN to the same version as the Playwright package.
+RUN playwright install --with-deps chromium
 
 # Copy project files
 COPY . .

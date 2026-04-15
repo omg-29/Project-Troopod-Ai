@@ -279,7 +279,7 @@ async def _scrape_fallback_bs4(url: str) -> ScrapedPage:
     base_url = f"{parsed.scheme}://{parsed.netloc}"
 
     # Extract CSS from <style> tags (linked CSS is harder to fetch reliably here without a browser)
-    soup = BeautifulSoup(html, "html.parser")
+    soup = BeautifulSoup(html, "lxml")
     inline_styles = [s.get_text() for s in soup.find_all("style")]
     raw_css = "\n\n".join(inline_styles)
 
