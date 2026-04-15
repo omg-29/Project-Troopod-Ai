@@ -1,0 +1,29 @@
+services:
+  # Backend - FastAPI + Playwright (Docker)
+  - type: web
+    name: troopod-backend
+    env: docker
+    dockerContext: backend
+    dockerfilePath: Dockerfile
+    plan: starter # Playwright needs at least 512MB RAM, but 'starter' is safer
+    envVars:
+      - key: GEMINI_API_KEY
+        sync: false # User must set this in Render dashboard
+      - key: CORS_ORIGINS
+        value: "http://localhost:5173" # Add your final static site URL here later
+      - key: PRIMARY_MODEL
+        value: "gemini-2.5-flash"
+
+  # Frontend - React (Static Site)
+  - type: web
+    name: troopod-frontend
+    env: static
+    buildCommand: npm install && npm run build
+    publishDir: dist
+    rootDirectory: frontend
+    envVars:
+      - key: VITE_API_URL
+        fromService:
+          type: web
+          name: troopod-backend
+          property: host
