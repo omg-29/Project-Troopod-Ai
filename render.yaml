@@ -5,12 +5,13 @@ services:
     env: docker
     dockerContext: backend
     dockerfilePath: Dockerfile
-    plan: starter # Playwright needs at least 512MB RAM, but 'starter' is safer
+    plan: starter # Playwright needs at least 512MB RAM
+    healthCheckPath: /api/health
     envVars:
       - key: GEMINI_API_KEY
-        sync: false # User must set this in Render dashboard
+        sync: false # Set this in Render dashboard
       - key: CORS_ORIGINS
-        value: "http://localhost:5173" # Add your final static site URL here later
+        value: "http://localhost:5173" # Update with your Render frontend URL later
       - key: PRIMARY_MODEL
         value: "gemini-2.5-flash"
 

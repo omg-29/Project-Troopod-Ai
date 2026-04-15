@@ -170,29 +170,34 @@ Troopod/
 
 ## Deployment
 
-Troopod is pre-configured for one-click deployment via **Render Blueprints**.
+Troopod is optimized for one-click deployment via **Render Blueprints** using a reliable Docker-based backend.
 
 ### 1. Push to GitHub
-Create a new repository on GitHub and push the entire project:
+Initialize your repository and push the entire codebase:
 ```bash
 git init
 git add .
-git commit -m "Initial commit: Troopod Production Ready"
+git commit -m "Production ready: Dockerized Backend"
 git remote add origin YOUR_REPO_URL
 git push -u origin main
 ```
 
-### 2. Connect to Render
-1. Log in to [Render](https://render.com).
+### 2. Launch on Render
+1. Go to your [Render Dashboard](https://render.com).
 2. Click **New +** -> **Blueprint**.
 3. Connect your GitHub repository.
-4. Render will automatically detect `render.yaml` and prompt you to create the infrastructure.
+4. Render will detect `render.yaml` and configure:
+   - **`troopod-backend`**: A Docker-based service hosting the FastAPI engine and Playwright.
+   - **`troopod-frontend`**: A Static Site service hosting the React UI.
 
-### 3. Configure Environment Variables
-In the Render dashboard, you must set the following:
+### 3. Essential Environment Setup
+Once the blueprint is created, go to the **Environment** settings for `troopod-backend` and set:
 
-- **`GEMINI_API_KEY`**: Your Google Gemini API key (on the `troopod-backend` service).
-- **`CORS_ORIGINS`**: Once your frontend is deployed, copy its URL and add it here (e.g., `https://troopod-frontend.onrender.com`).
+- **`GEMINI_API_KEY`**: (Required) your Google Gemini API key.
+- **`CORS_ORIGINS`**: (Important) Copy your frontend's live URL (e.g., `https://troopod-frontend.onrender.com`) and add it here. This allows the UI to talk to the backend.
+
+### Why Docker?
+Troopod uses Docker specifically to bundle **Playwright Chromium** with all its native Linux library dependencies. This guarantees that web scraping works flawlessly in the cloud without "Missing shared library" errors common in standard Python environments.
 
 ---
 
