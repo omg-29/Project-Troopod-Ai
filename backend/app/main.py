@@ -154,6 +154,7 @@ async def _run_pipeline(
             text_requirements=text_requirements,
             image_analysis=image_analysis,
             accessibility_tree=scraped_page.accessibility_tree,
+            visual_theme=scraped_page.visual_theme,
         )
     except Exception as exc:
         logger.error("Step 4a failed: %s", exc)

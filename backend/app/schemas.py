@@ -49,6 +49,7 @@ class ScrapedPage(BaseModel):
     js_bundle: str = Field(description="Concatenated JavaScript content from inline and linked scripts.")
     accessibility_tree: dict = Field(default_factory=dict, description="Accessibility tree snapshot of the page.")
     screenshot_base64: str = Field(description="Base64-encoded full-page PNG screenshot.")
+    visual_theme: dict = Field(default_factory=dict, description="Extracted theme info (colors, fonts, variables).")
     base_url: str = Field(description="The resolved base URL of the scraped page.")
 
 

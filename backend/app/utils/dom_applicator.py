@@ -189,25 +189,28 @@ def _op_replace_text(element: Tag, op: PageOperation) -> None:
 def _op_replace_html(soup: BeautifulSoup, element: Tag, op: PageOperation) -> None:
     """Replace the inner HTML of an element."""
     element.clear()
-    new_content = BeautifulSoup(op.new_content, "html.parser")
-    for child in list(new_content.children):
+    new_content = BeautifulSoup(op.new_content.strip(), "html.parser")
+    # For fragments, we need to iterate through children of the parsed fragment
+    # Some parsers wrap fragments in <html><body> tags, we want the content inside.
+    target_nodes = new_content.body.contents if new_content.body else new_content.contents
+    for child in list(target_nodes):
         element.append(child)
 
 
 def _op_inject_before(soup: BeautifulSoup, element: Tag, op: PageOperation) -> None:
     """Insert new HTML immediately before an element."""
-    new_content = BeautifulSoup(op.new_content, "html.parser")
-    for child in reversed(list(new_content.children)):
+    new_content = BeautifulSoup(op.new_content.strip(), "html.parser")
+    target_nodes = new_content.body.contents if new_content.body else new_content.contents
+    for child in reversed(list(target_nodes)):
         element.insert_before(child)
 
 
 def _op_inject_after(soup: BeautifulSoup, element: Tag, op: PageOperation) -> None:
     """Insert new HTML immediately after an element."""
-    new_content = BeautifulSoup(op.new_content, "html.parser")
-    # insert_after in order — need to insert in reverse to maintain order
-    children = list(new_content.children)
+    new_content = BeautifulSoup(op.new_content.strip(), "html.parser")
+    target_nodes = new_content.body.contents if new_content.body else new_content.contents
     ref = element
-    for child in children:
+    for child in list(target_nodes):
         ref.insert_after(child)
         ref = child
 

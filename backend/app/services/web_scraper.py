@@ -99,6 +99,52 @@ async def _get_accessibility_tree(page) -> dict:
         return {}
 
 
+async def _extract_visual_theme(page) -> dict:
+    """Extract theme info: background, text colors, fonts, and CSS variables."""
+    try:
+        theme = await page.evaluate("""
+            () => {
+                const bodyStyles = getComputedStyle(document.body);
+                const theme = {
+                    backgroundColor: bodyStyles.backgroundColor,
+                    color: bodyStyles.color,
+                    fontFamily: bodyStyles.fontFamily,
+                    variables: {}
+                };
+
+                // Scan :root and body for brand-related CSS variables
+                try {
+                    for (let i = 0; i < document.styleSheets.length; i++) {
+                        try {
+                            const rules = document.styleSheets[i].cssRules;
+                            if (!rules) continue;
+                            for (let j = 0; j < rules.length; j++) {
+                                const rule = rules[j];
+                                if (rule.selectorText === ':root' || rule.selectorText === 'body') {
+                                    const s = rule.style;
+                                    for (let k = 0; k < s.length; k++) {
+                                        const prop = s[k];
+                                        if (prop.startsWith('--')) {
+                                            const val = s.getPropertyValue(prop).trim();
+                                            if (prop.includes('color') || prop.includes('primary') || prop.includes('brand') || prop.includes('accent')) {
+                                                theme.variables[prop] = val;
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        } catch (e) {}
+                    }
+                } catch (global_e) {}
+                return theme;
+            }
+        """)
+        return theme
+    except Exception as e:
+        logger.warning("Visual theme extraction failed: %s", e)
+        return {}
+
+
 async def _scrape_with_playwright_async(url: str) -> ScrapedPage:
     """
     Full Playwright-based scraping logic.
@@ -204,6 +250,9 @@ async def _scrape_with_playwright_async(url: str) -> ScrapedPage:
             # Accessibility tree
             a11y_tree = await _get_accessibility_tree(page)
 
+            # Visual Theme
+            visual_theme = await _extract_visual_theme(page)
+
             # Full-page screenshot
             screenshot_bytes = await page.screenshot(full_page=True)
             screenshot_b64 = base64.b64encode(screenshot_bytes).decode("utf-8")
@@ -214,6 +263,7 @@ async def _scrape_with_playwright_async(url: str) -> ScrapedPage:
                 js_bundle=cleaned_js,
                 accessibility_tree=a11y_tree,
                 screenshot_base64=screenshot_b64,
+                visual_theme=visual_theme,
                 base_url=base_url,
             )
 
