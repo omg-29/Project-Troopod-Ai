@@ -24,6 +24,8 @@ services:
     rootDirectory: frontend
     envVars:
       - key: VITE_API_URL
+        # Note: 'fromService' often provides an internal host unreachable from browsers.
+        # Manual override in the dashboard to the backend's PUBLIC URL is recommended.
         fromService:
           type: web
           name: troopod-backend

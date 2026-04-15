@@ -203,7 +203,11 @@ Troopod uses Docker specifically to bundle **Playwright Chromium** with all its 
 
 ## Troubleshooting
 
-1. **`NotImplementedError` during scraping**: Caused by Uvicorn event loop policies on Windows. Ensure `main.py` starts with `asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())`. Troopod has built-in thread isolation for Playwright bridging to solve this natively.
+1. **`NotImplementedError` during scraping**: Caused by Uvicorn event loop policies on Windows. Ensuring OS-aware loop policy in `main.py` solves this for production.
+2. **`Failed to Fetch` in Production**:
+   - **Check API URL**: Open your browser console (F12). If you see `[Troopod] Initializing generation | Target API: http://localhost:8000`, it means your frontend is still trying to talk to your local machine. You **must** manually set `VITE_API_URL` to your backend's public URL in the Render dashboard.
+   - **Check CORS**: If the URL is correct but still failing, ensure the `CORS_ORIGINS` variable in your **Backend** settings on Render matches your **Frontend** URL exactly.
+3. **Blank White Page**: Usually caused by absolute path resolution. Ensure the latest `vite.config.js` with `base: './'` is deployed.
 2. **`503 / 429 API Capacity` errors**: Google's free-tier APIs occasionally block heavy HTML generation requests. Troopod's `ai_client` employs an automated exponential backoff mechanism and will automatically switch to your configured `FALLBACK_MODEL` to retry. Ensure your API Key originates from a project matching your desired Models list.
 3. **Missing CSS Base64 / Fonts on Preview**: Verify `url_rewriter.py` successfully intercepted the stylesheet download; Troopod automatically anchors relative CSS fonts against their native source server.
 4. **Playwright browser not found**: Run `npx playwright install chromium` or `playwright install chromium` inside your activated directory.

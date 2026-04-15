@@ -10,6 +10,7 @@ import { API_URL } from './constants';
  * @returns {Promise<Response>} Fetch response with SSE stream
  */
 export async function generateCRO(imageFile, url, text) {
+  console.log(`[Troopod] Initializing generation | Target API: ${API_URL}/api/generate`);
   const formData = new FormData();
   formData.append('image', imageFile);
   formData.append('url', url);
