@@ -1,9 +1,11 @@
 import asyncio
 import base64
 import logging
-from urllib.parse import urljoin, urlparse
+from urllib.parse import urlparse
 
 from playwright.async_api import async_playwright, TimeoutError as PlaywrightTimeout
+import httpx
+from bs4 import BeautifulSoup
 
 from app.config import settings
 from app.schemas import ScrapedPage
@@ -14,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 
 async def _scroll_to_bottom(page) -> None:
-    """Scroll page to bottom to trigger lazy-loaded content."""
+    """Scroll page to bottom to trigger lazy-loaded content efficiently."""
     try:
         await page.evaluate("""
             async () => {
@@ -22,12 +24,15 @@ async def _scroll_to_bottom(page) -> None:
                 const scrollHeight = () => document.body.scrollHeight;
                 let lastHeight = 0;
                 let currentHeight = scrollHeight();
+                let attempts = 0;
 
-                while (lastHeight !== currentHeight) {
+                // Max 10 scrolls to prevent infinite loops on truly infinite pages
+                while (lastHeight !== currentHeight && attempts < 10) {
                     lastHeight = currentHeight;
                     window.scrollTo(0, currentHeight);
-                    await delay(500);
+                    await delay(800);
                     currentHeight = scrollHeight();
+                    attempts++;
                 }
                 window.scrollTo(0, 0);
             }
@@ -101,7 +106,18 @@ async def _scrape_with_playwright_async(url: str) -> ScrapedPage:
     from app.utils.content_optimizer import optimize_scraped_content
 
     async with async_playwright() as p:
-        browser = await p.chromium.launch(headless=True)
+        # Optimized flags for constrained environments (Free Tier / Docker)
+        browser = await p.chromium.launch(
+            headless=True,
+            args=[
+                "--disable-dev-shm-usage",
+                "--no-sandbox",
+                "--disable-setuid-sandbox",
+                "--disable-gpu",
+                "--disable-web-security",
+                "--disable-features=IsolateOrigins,site-per-process",
+            ]
+        )
         context = await browser.new_context(
             viewport={"width": 1440, "height": 900},
             user_agent=(
@@ -111,6 +127,39 @@ async def _scrape_with_playwright_async(url: str) -> ScrapedPage:
             ),
         )
         page = await context.new_page()
+
+        # Tactical Resource Blocking: Saves RAM/CPU without breaking page logic
+        BLOCK_PATTERNS = [
+            "google-analytics.com", "googletagmanager.com", "facebook.net", 
+            "doubleclick.net", "hotjar.com", "clarity.ms", "intercom.io",
+            "facebook.com/tr", "pixel.wp.com"
+        ]
+
+        # Extract domain for first-party check
+        target_domain = urlparse(url).netloc
+
+        async def _intercept_route(route):
+            request = route.request
+            resource_type = request.resource_type
+            url_lower = request.url.lower()
+            
+            # ALWAYS allow first-party resources (scripts/css/images from the same domain)
+            # This is the "Brave Browser" safety fix to ensure site logic never breaks.
+            if target_domain in url_lower:
+                return await route.continue_()
+
+            # 1. Block heavy media and redundant fonts (even if first-party, they are too heavy)
+            if resource_type in ("video", "audio", "font"):
+                return await route.abort()
+
+            # 2. Block known third-party tracking/analytics domains
+            if any(pattern in url_lower for pattern in BLOCK_PATTERNS):
+                return await route.abort()
+
+            # Allow everything else (HTML, JS, CSS, and Images for visual reference)
+            await route.continue_()
+
+        await page.route("**/*", _intercept_route)
 
         try:
             # Wait for domcontentloaded (more reliable than networkidle for heavy SPAs)
@@ -183,6 +232,73 @@ def _scrape_sync_thread(url: str) -> ScrapedPage:
         return new_loop.run_until_complete(_scrape_with_playwright_async(url))
     finally:
         new_loop.close()
+
+
+async def _scrape_with_httpx(url: str) -> str:
+    """
+    Lightweight fallback: Fetch raw HTML using httpx.
+    Bypasses the overhead of a full browser engine.
+    """
+    logger.info("Attempting lightweight fetch with HTTPX for: %s", url)
+    headers = {
+        "User-Agent": (
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) "
+            "Chrome/131.0.0.0 Safari/537.36"
+        ),
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.5",
+    }
+    
+    async with httpx.AsyncClient(
+        follow_redirects=True, 
+        timeout=30.0,
+        verify=False  # More resilient for fallback scenarios
+    ) as client:
+        response = await client.get(url, headers=headers)
+        response.raise_for_status()
+        return response.text
+
+
+async def _scrape_fallback_bs4(url: str) -> ScrapedPage:
+    """
+    Defensive Fallback: Uses BeautifulSoup to reconstruct a ScrapedPage 
+    schema from raw HTML when Playwright fails.
+    """
+    from app.utils.content_optimizer import optimize_scraped_content
+    
+    logger.info("Triggering Defensive Scraping (BS4 Fallback) for: %s", url)
+    
+    try:
+        html = await _scrape_with_httpx(url)
+    except Exception as http_err:
+        logger.error("HTTPX fallback also failed: %s", http_err)
+        raise RuntimeError(f"All scraping methods failed for {url}") from http_err
+
+    parsed = urlparse(url)
+    base_url = f"{parsed.scheme}://{parsed.netloc}"
+
+    # Extract CSS from <style> tags (linked CSS is harder to fetch reliably here without a browser)
+    soup = BeautifulSoup(html, "html.parser")
+    inline_styles = [s.get_text() for s in soup.find_all("style")]
+    raw_css = "\n\n".join(inline_styles)
+
+    # Optimization Step
+    cleaned_html, cleaned_css, _ = optimize_scraped_content(
+        html=html,
+        css=raw_css,
+        js="",
+        base_url=base_url,
+    )
+
+    return ScrapedPage(
+        cleaned_html=cleaned_html,
+        css_bundle=cleaned_css,
+        js_bundle="",
+        accessibility_tree={},
+        screenshot_base64="",  # No screenshot in BS4 fallback
+        base_url=base_url,
+    )
 
 
 
@@ -268,14 +384,14 @@ async def scrape_page(url: str) -> ScrapedPage:
         return result
 
     except PlaywrightTimeout:
-        logger.error("Playwright timed out for URL: %s", url)
-        if screenshot_b64:
-            return await _fallback_from_screenshot(screenshot_b64, url)
-        raise RuntimeError(f"Page scraping timed out for {url}")
+        logger.error("Playwright timed out for URL: %s. Switching to fallback.", url)
+        return await _scrape_fallback_bs4(url)
 
     except Exception as scrape_err:
         err_msg = getattr(scrape_err, "message", repr(scrape_err))
-        logger.error("Scraping failed for %s: %s", url, err_msg)
-        if screenshot_b64:
-            return await _fallback_from_screenshot(screenshot_b64, url)
-        raise RuntimeError(f"Scraping failed: {err_msg}") from scrape_err
+        logger.error("Scraping failed for %s: %s. Attempting fallback.", url, err_msg)
+        try:
+            return await _scrape_fallback_bs4(url)
+        except Exception as fallback_err:
+            logger.error("Fallback also failed: %s", fallback_err)
+            raise RuntimeError(f"Scraping failed: {err_msg}") from scrape_err
