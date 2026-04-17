@@ -12,8 +12,9 @@ logger = logging.getLogger(__name__)
 async def repair_json(broken_json: str) -> str:
     """
     Attempt to repair invalid JSON by sending it to Gemini with a repair prompt.
-    One retry attempt before raising an error.
+    Up to 2 attempts with a 10s delay if rate limited.
     """
+    import asyncio
     client = genai.Client(api_key=settings.GEMINI_API_KEY)
 
     repair_prompt = (
@@ -24,28 +25,33 @@ async def repair_json(broken_json: str) -> str:
         f"Broken JSON:\n{broken_json}"
     )
 
-    try:
-        response = client.models.generate_content(
-            model=settings.PRIMARY_MODEL,
-            contents=repair_prompt,
-            config=types.GenerateContentConfig(
-                temperature=0.0,
-            ),
-        )
+    for attempt in range(2):
+        try:
+            response = client.models.generate_content(
+                model=settings.PRIMARY_MODEL,
+                contents=repair_prompt,
+                config=types.GenerateContentConfig(
+                    temperature=0.0,
+                ),
+            )
 
-        repaired = response.text.strip()
-        # Strip markdown fences if present
-        if repaired.startswith("```"):
-            lines = repaired.split("\n")
-            lines = [l for l in lines if not l.strip().startswith("```")]
-            repaired = "\n".join(lines)
+            repaired = response.text.strip()
+            # Strip markdown fences if present
+            if repaired.startswith("```"):
+                lines = repaired.split("\n")
+                lines = [l for l in lines if not l.strip().startswith("```")]
+                repaired = "\n".join(lines)
 
-        json.loads(repaired)
-        return repaired
+            json.loads(repaired)
+            return repaired
 
-    except (json.JSONDecodeError, Exception) as exc:
-        logger.error("JSON repair failed: %s", exc)
-        raise ValueError(f"JSON repair failed after retry: {exc}") from exc
+        except (json.JSONDecodeError, Exception) as exc:
+            if attempt == 0 and ("429" in str(exc) or "503" in str(exc)):
+                logger.warning("JSON repair rate limited. Retrying in %ds...", settings.REPAIR_RETRY_DELAY)
+                await asyncio.sleep(settings.REPAIR_RETRY_DELAY)
+                continue
+            logger.error("JSON repair failed: %s", exc)
+            raise ValueError(f"JSON repair failed after {attempt + 1} attempts: {exc}") from exc
 
 
 def validate_and_parse_json(raw: str) -> dict:

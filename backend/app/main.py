@@ -103,6 +103,7 @@ async def _run_pipeline(
         ))
 
     # --- Step 2: Image Creative Processing ---
+    await asyncio.sleep(settings.PIPELINE_STEP_DELAY)
     yield _sse_event(StatusEvent(
         stage="analysis",
         message="Analyzing your ad creative with AI vision...",
@@ -143,6 +144,7 @@ async def _run_pipeline(
     ))
 
     # --- Step 4a: Prompt Enhancement ---
+    await asyncio.sleep(settings.PIPELINE_STEP_DELAY)
     yield _sse_event(StatusEvent(
         stage="generation",
         message="Building CRO optimization strategy...",
@@ -168,6 +170,7 @@ async def _run_pipeline(
     ))
 
     # --- Step 4b: Code Modification ---
+    await asyncio.sleep(settings.PIPELINE_STEP_DELAY)
     try:
         modified_page = await modify_page(
             master_prompt=master_prompt,

@@ -12,6 +12,8 @@ class Settings(BaseSettings):
     ALLOWED_MIME_TYPES: ClassVar[list[str]] = ["image/jpeg", "image/png"]
     CORS_ORIGINS: list[str] = ["http://localhost:5173", "http://127.0.0.1:5173"]
     SCRAPE_TIMEOUT_MS: int = 120000
+    PIPELINE_STEP_DELAY: int = 15
+    REPAIR_RETRY_DELAY: int = 10
 
     @property
     def cors_origins_list(self) -> list[str]:

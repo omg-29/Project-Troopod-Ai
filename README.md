@@ -46,6 +46,8 @@ Frontend: Secure iframe preview (srcDoc + sandbox)
 | `GEMINI_API_KEY` | Yes | -- | Google Gemini API key |
 | `PRIMARY_MODEL` | No | `gemini-2.5-flash` | Primary Gemini model |
 | `FALLBACK_MODEL` | No | `gemini-2.5-flash-lite` | Fallback model upon rate limit |
+| `PIPELINE_STEP_DELAY` | No | `15` | Delay (seconds) between AI pipeline stages |
+| `REPAIR_RETRY_DELAY` | No | `10` | Delay (seconds) for JSON repair retries |
 
 ### Frontend (`frontend/.env`)
 
@@ -109,6 +111,7 @@ The frontend runs at `http://localhost:5173` and proxies API requests to `http:/
 - **Content Optimization:** Raw web pages are sent through a character-limiter that strips non-visual `data-*` attributes, base64 blobs, analytics scripts, and comments. This reduces token payloads by ~80%, eliminating generation timeouts and drastically saving costs.
 - **Lean Scraping (Free Tier Optimization):** To ensure stability on constrained environments (like Render Free Tier), the scraper employs tactical resource interception to block heavy, non-essential assets (Tracking scripts, Ads, Videos, and Fonts) *before* they consume RAM and CPU, while preserving critical visual elements.
 - **Smart Path Rewriting:** Transforms all relative URLs across CSS stylesheets and HTML into absolute paths, preventing `404 Not Found` errors when rendering the foreign webpage locally.
+- **Rate Limit Management (Proactive Pacing):** To survive strict API quotas (like Google Gemini Free Tier), the pipeline implements intentional delays between processing stages. By default, it waits 15s between AI calls, ensuring tokens-per-minute (TPM) and requests-per-minute (RPM) limits are never exceeded during a single cycle.
 - **Organic Code Modification Directive:** AI is strictly prompted to inject modifications that respect the legacy DOM structure, inheriting original global typography CSS rather than brute-forcing new designs.
 - **Surgical DOM Patching:** Instead of regenerating entire HTML documents (which hits token limits), Troopod uses a diff-based approach where Gemini returns structured JSON operations applied surgically via BeautifulSoup. This allows for processing pages up to 500K+ characters.
 - **Defensive Scraping Fallback:** If the full browser-based scraping engine fails or times out, the system automatically triggers a lightweight fallback using `HTTPX` and `lxml`. This "safety net" ensures the pipeline continues even if heavy browser rendering is impossible.
