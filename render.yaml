@@ -14,6 +14,8 @@ services:
         value: "http://localhost:5173" # Update with your Render frontend URL later
       - key: PRIMARY_MODEL
         value: "gemini-2.5-flash"
+      - key: FALLBACK_PACING_DELAY
+        value: "15"
 
   # Frontend - React (Static Site)
   - type: web

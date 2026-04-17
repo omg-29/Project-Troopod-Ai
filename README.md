@@ -47,6 +47,7 @@ Frontend: Secure iframe preview (srcDoc + sandbox)
 | `PRIMARY_MODEL` | No | `gemini-2.5-flash` | Primary Gemini model |
 | `FALLBACK_MODEL` | No | `gemini-2.5-flash-lite` | Fallback model upon rate limit |
 | `PIPELINE_STEP_DELAY` | No | `15` | Delay (seconds) between AI pipeline stages |
+| `FALLBACK_PACING_DELAY` | No | `15` | Delay (seconds) before switching to fallback model |
 | `REPAIR_RETRY_DELAY` | No | `10` | Delay (seconds) for JSON repair retries |
 
 ### Frontend (`frontend/.env`)
@@ -214,7 +215,7 @@ Troopod uses Docker specifically to bundle **Playwright Chromium** with all its 
    - **Check API URL**: Open your browser console (F12). If you see `[Troopod] Initializing generation | Target API: http://localhost:8000`, it means your frontend is still trying to talk to your local machine. You **must** manually set `VITE_API_URL` to your backend's public URL in the Render dashboard.
    - **Check CORS**: If the URL is correct but still failing, ensure the `CORS_ORIGINS` variable in your **Backend** settings on Render matches your **Frontend** URL exactly.
 3. **Blank White Page**: Usually caused by absolute path resolution. Ensure the latest `vite.config.js` with `base: './'` is deployed.
-2. **`503 / 429 API Capacity` errors**: Google's free-tier APIs occasionally block heavy HTML generation requests. Troopod's `ai_client` employs an automated exponential backoff mechanism and will automatically switch to your configured `FALLBACK_MODEL` to retry. Ensure your API Key originates from a project matching your desired Models list.
+2. **`503 / 429 API Capacity` errors**: Google's free-tier APIs occasionally block heavy HTML generation requests. Troopod's `ai_client` employs an automated exponential backoff mechanism and a mandatory cooldown phase (`FALLBACK_PACING_DELAY`). If the primary model fails, the system waits (default 15s) before attempting the `FALLBACK_MODEL` to ensure the API quota has reset. Ensure your API Key originates from a project matching your desired Models list.
 3. **Missing CSS Base64 / Fonts on Preview**: Verify `url_rewriter.py` successfully intercepted the stylesheet download; Troopod automatically anchors relative CSS fonts against their native source server.
 4. **Playwright browser not found**: Run `npx playwright install chromium` or `playwright install chromium` inside your activated directory.
 

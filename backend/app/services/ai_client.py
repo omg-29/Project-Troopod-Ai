@@ -1,5 +1,6 @@
 import logging
 import base64
+import asyncio
 from typing import Optional, Type
 
 from google import genai
@@ -67,7 +68,6 @@ class AIClient:
                 if "503" in primary_err_msg or "429" in primary_err_msg:
                     delay = [8, 15, 25][attempt]
                     logger.warning("Primary model structured 503/429. Retry %d in %ds...", attempt + 1, delay)
-                    import asyncio
                     await asyncio.sleep(delay)
                     continue
                 break
@@ -77,6 +77,9 @@ class AIClient:
             self.primary_model,
             primary_err_msg,
         )
+
+        logger.info("Waiting %ds before attempting fallback model (%s) to avoid immediate rate limiting...", settings.FALLBACK_PACING_DELAY, self.fallback_model)
+        await asyncio.sleep(settings.FALLBACK_PACING_DELAY)
 
         # Attempt 2: Fallback model with 2 retries
         for attempt in range(3):
@@ -95,7 +98,6 @@ class AIClient:
                 if "503" in str(fallback_err) or "429" in str(fallback_err):
                     delay = [8, 15, 25][attempt]
                     logger.warning("Fallback model structured 503/429. Retry %d in %ds...", attempt + 1, delay)
-                    import asyncio
                     await asyncio.sleep(delay)
                     continue
                 logger.error(
@@ -140,7 +142,6 @@ class AIClient:
                 if "503" in primary_err_msg or "429" in primary_err_msg:
                     delay = [8, 15, 25][attempt]
                     logger.warning("Primary model text 503/429. Retry %d in %ds...", attempt + 1, delay)
-                    import asyncio
                     await asyncio.sleep(delay)
                     continue
                 break
@@ -150,6 +151,9 @@ class AIClient:
             self.primary_model,
             primary_err_msg,
         )
+
+        logger.info("Waiting %ds before attempting fallback model (%s) to avoid immediate rate limiting...", settings.FALLBACK_PACING_DELAY, self.fallback_model)
+        await asyncio.sleep(settings.FALLBACK_PACING_DELAY)
 
         # Attempt 2: Fallback model with 2 retries
         for attempt in range(3):
@@ -164,7 +168,6 @@ class AIClient:
                 if "503" in str(fallback_err) or "429" in str(fallback_err):
                     delay = [8, 15, 25][attempt]
                     logger.warning("Fallback model text 503/429. Retry %d in %ds...", attempt + 1, delay)
-                    import asyncio
                     await asyncio.sleep(delay)
                     continue
                 logger.error(

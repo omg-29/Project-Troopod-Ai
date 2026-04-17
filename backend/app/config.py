@@ -14,6 +14,7 @@ class Settings(BaseSettings):
     SCRAPE_TIMEOUT_MS: int = 120000
     PIPELINE_STEP_DELAY: int = 15
     REPAIR_RETRY_DELAY: int = 10
+    FALLBACK_PACING_DELAY: int = 15
 
     @property
     def cors_origins_list(self) -> list[str]:
